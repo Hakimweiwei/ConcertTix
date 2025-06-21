@@ -1,0 +1,2854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="/assets/images/logo_3.png" type="image/x-icon">
+  <title>ConcertTix Admin Dashboard</title>
+
+  <!-- Bootstrap CSS & Icons -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"></noscript>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- GSAP for animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
+
+  <!-- Javascrip navigasi navbar -->
+  <script>
+    // Add this to your existing JavaScript code
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // ... existing code ...
+        
+        // Setup sidebar navigation clicks
+        setupSidebarNavigation();
+        
+        // Setup scroll spy to highlight active section
+        setupScrollSpy();
+    });
+
+    // Function to setup scroll spy
+    function setupScrollSpy() {
+  const sections = [
+    { id: 'slider-section', navText: 'Slider Management' },
+    { id: 'featured-section', navText: 'Featured Concerts' },
+    { id: 'all-section', navText: 'All Concerts' }
+  ];
+  
+  const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+  
+  function checkActiveSection() {
+    let currentSection = null;
+    const scrollPosition = window.scrollY + 100;
+    const headerHeight = document.querySelector('.admin-header').offsetHeight;
+    
+    // Check if at top of page
+    if (scrollPosition < headerHeight) {
+      currentSection = 'Dashboard';
+    } else {
+      // Check other sections
+      for (const section of sections) {
+        const element = document.getElementById(section.id);
+        if (element) {
+          const offsetTop = element.offsetTop - headerHeight;
+          const offsetHeight = element.offsetHeight;
+          
+          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
+            currentSection = section.navText;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Update active nav item
+    navItems.forEach(item => {
+      const itemText = item.querySelector('.nav-item-text').textContent.trim();
+      if (itemText === currentSection) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+  }
+  
+  // Initial check
+  checkActiveSection();
+  
+  // Check on scroll
+  window.addEventListener('scroll', checkActiveSection);
+}
+
+    // Function to setup sidebar navigation clicks
+    function setupSidebarNavigation() {
+        // Get all nav items
+        const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+        
+        // Add click event to each nav item
+        navItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // Get the text content of the clicked item
+                const sectionName = this.querySelector('.nav-item-text').textContent.trim();
+                
+                // Map the section names to their corresponding IDs
+                const sectionMap = {
+                    'Dashboard': null, // Dashboard is at the top
+                    'Slider Management': 'slider-section',
+                    'Featured Concerts': 'featured-section',
+                    'All Concerts': 'all-section'
+                };
+                
+                // Get the section ID
+                const sectionId = sectionMap[sectionName];
+                
+                if (sectionId) {
+                    // Get the section element
+                    const section = document.getElementById(sectionId);
+                    
+                    if (section) {
+                        // Scroll to the section with smooth behavior
+                        section.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                        
+                        // Add a slight highlight effect
+                        section.style.transition = 'box-shadow 0.3s';
+                        section.style.boxShadow = '0 0 0 4px rgba(138, 79, 255, 0.3)';
+                        
+                        // Remove the highlight after 1 second
+                        setTimeout(() => {
+                            section.style.boxShadow = 'none';
+                        }, 1000);
+                    }
+                } else if (sectionName === 'Dashboard') {
+                    // Scroll to top for Dashboard
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                }
+                
+                // Set active nav item
+                navItems.forEach(nav => nav.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Close mobile sidebar if open
+                if (document.body.classList.contains('sidebar-show')) {
+                    document.body.classList.remove('sidebar-show');
+                }
+            });
+        });
+    }
+  </script>
+  </script>
+
+  <style>
+    /* Tambahkan style untuk map container */
+    #concertMap {
+      height: 300px;
+      width: 100%;
+      border-radius: 8px;
+      margin-top: 15px;
+    }
+    
+    /* Style untuk modal yang lebih lebar */
+    .concert-modal-lg {
+      max-width: 800px;
+    }
+
+    /* VARIABLES */
+    :root {
+      --primary-purple: #8a4fff;
+      --primary-orange: #ff6600;
+      --gradient-purple: linear-gradient(135deg, #8a4fff 0%, #5e2de0 100%);
+      --sidebar-width: 280px;
+      --header-height: 70px;
+    }
+    
+    /* BASE STYLES */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f7fa;
+      overflow-x: hidden;
+    }
+    
+    /* Admin Layout */
+    .admin-container {
+      display: flex;
+      min-height: 100vh;
+    }
+    
+    /* Sidebar Styles */
+    .admin-sidebar {
+      width: var(--sidebar-width);
+      background: linear-gradient(180deg, #2a3042 0%, #1e2233 100%);
+      color: #a6b0cf;
+      position: fixed;
+      height: 100vh;
+      z-index: 1000;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .sidebar-collapsed .admin-sidebar {
+      width: 80px;
+    }
+    
+    .sidebar-collapsed .admin-main {
+      margin-left: 80px;
+    }
+    
+    .sidebar-collapsed .sidebar-brand span,
+    .sidebar-collapsed .nav-item-text {
+      display: none;
+    }
+    
+    .sidebar-collapsed .nav-item {
+      justify-content: center;
+    }
+    
+    .sidebar-collapsed .sidebar-footer {
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .sidebar-collapsed .sidebar-footer-text {
+      display: none;
+    }
+    
+    .sidebar-brand {
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .sidebar-brand span {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-left: 10px;
+      color: white;
+    }
+    
+    .sidebar-brand-icon {
+      font-size: 1.8rem;
+      color: var(--primary-orange);
+    }
+    
+    .sidebar-nav {
+      padding: 20px 0;
+      height: calc(100vh - var(--header-height) - 70px);
+      overflow-y: auto;
+    }
+    
+    .sidebar-nav::-webkit-scrollbar {
+      width: 5px;
+    }
+    
+    .sidebar-nav::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+    }
+    
+    .nav-item {
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border-left: 3px solid transparent;
+    }
+    
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: white;
+    }
+    
+    .nav-item.active {
+      background: rgba(138, 79, 255, 0.1);
+      border-left: 3px solid var(--primary-purple);
+      color: white;
+    }
+    
+    .nav-item.active .nav-icon {
+      color: var(--primary-purple);
+    }
+    
+    .nav-icon {
+      font-size: 1.2rem;
+      margin-right: 10px;
+      color: #a6b0cf;
+      transition: all 0.3s ease;
+    }
+    
+    .nav-item-text {
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+    
+    .sidebar-footer {
+      height: 70px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: var(--primary-purple);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    
+    .user-name {
+      color: white;
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    
+    .user-role {
+      color: #a6b0cf;
+      font-size: 0.8rem;
+    }
+    
+    /* Main Content Styles */
+    .admin-main {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      transition: all 0.3s ease;
+    }
+    
+    .admin-header {
+      height: var(--header-height);
+      background-color: white;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 25px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+    }
+    
+    .sidebar-toggle {
+      font-size: 1.5rem;
+      color: #6c757d;
+      cursor: pointer;
+      margin-right: 20px;
+      transition: all 0.3s ease;
+    }
+    
+    .sidebar-toggle:hover {
+      color: var(--primary-purple);
+    }
+    
+    .page-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #2a3042;
+      margin-bottom: 0;
+    }
+    
+    .header-right {
+      display: flex;
+      align-items: center;
+    }
+    
+    .notification-bell {
+      position: relative;
+      margin-right: 20px;
+      color: #6c757d;
+      font-size: 1.3rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .notification-bell:hover {
+      color: var(--primary-purple);
+    }
+    
+    .notification-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 18px;
+      height: 18px;
+      background-color: var(--primary-orange);
+      color: white;
+      border-radius: 50%;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .admin-content {
+      padding: 25px;
+    }
+    
+    /* Card Styles */
+    .admin-card {
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      margin-bottom: 25px;
+      border: none;
+    }
+    
+    .card-header {
+      background-color: transparent;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      padding: 15px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #2a3042;
+      margin-bottom: 0;
+    }
+    
+    .card-body {
+      padding: 20px;
+    }
+    
+    /* Stats Cards */
+    .stats-card {
+      padding: 20px;
+      border-radius: 10px;
+      color: white;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    
+    .stats-card::before {
+      content: '';
+      position: absolute;
+      top: -20px;
+      right: -20px;
+      width: 80px;
+      height: 80px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+    }
+    
+    .stats-card .icon {
+      font-size: 2.5rem;
+      opacity: 0.5;
+      margin-bottom: 15px;
+    }
+    
+    .stats-card .value {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    
+    .stats-card .label {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+    
+    .stats-card.purple {
+      background: var(--gradient-purple);
+    }
+    
+    .stats-card.orange {
+      background: linear-gradient(135deg, #ff6600 0%, #ff8c00 100%);
+    }
+    
+    .stats-card.green {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    }
+    
+    .stats-card.blue {
+      background: linear-gradient(135deg, #007bff 0%, #17a2b8 100%);
+    }
+    
+    /* Buttons */
+    .btn-purple {
+      background-color: var(--primary-purple);
+      color: white;
+      border: none;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-purple:hover {
+      background-color: #7a3fef;
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(138, 79, 255, 0.3);
+    }
+    
+    .btn-orange {
+      background-color: var(--primary-orange);
+      color: white;
+      border: none;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-orange:hover {
+      background-color: #e55d00;
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(255, 102, 0, 0.3);
+    }
+    
+    .btn-outline-purple {
+      border-color: var(--primary-purple);
+      color: var(--primary-purple);
+      transition: all 0.3s ease;
+    }
+    
+    .btn-outline-purple:hover {
+      background-color: var(--primary-purple);
+      color: white;
+    }
+    
+    /* Table Styles */
+    .table-responsive {
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    
+    .table {
+      margin-bottom: 0;
+    }
+    
+    .table thead th {
+      background-color: #f8f9fa;
+      border-bottom-width: 1px;
+      font-weight: 600;
+      color: #495057;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      letter-spacing: 0.5px;
+    }
+    
+    .table tbody tr {
+      transition: all 0.3s ease;
+    }
+    
+    .table tbody tr:hover {
+      background-color: rgba(138, 79, 255, 0.05);
+    }
+    
+    .table .badge {
+      font-weight: 500;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+    }
+    
+    .table .actions {
+      white-space: nowrap;
+    }
+    
+    .table .actions .btn {
+      padding: 5px 10px;
+      font-size: 0.8rem;
+      margin-right: 5px;
+    }
+    
+    /* Form Styles */
+    .form-control, .form-select {
+      border-radius: 8px;
+      padding: 10px 15px;
+      border: 1px solid #e1e5eb;
+      transition: all 0.3s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+      border-color: var(--primary-purple);
+      box-shadow: 0 0 0 0.2rem rgba(138, 79, 255, 0.1);
+    }
+    
+    .form-label {
+      font-weight: 500;
+      color: #495057;
+      margin-bottom: 8px;
+    }
+    
+    /* Custom file upload */
+    .custom-file-upload {
+      border: 1px dashed #e1e5eb;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background-color: #f8f9fa;
+    }
+    
+    .custom-file-upload:hover {
+      border-color: var(--primary-purple);
+      background-color: rgba(138, 79, 255, 0.05);
+    }
+    
+    .custom-file-upload i {
+      font-size: 2rem;
+      color: var(--primary-purple);
+      margin-bottom: 10px;
+    }
+    
+    .custom-file-upload .file-name {
+      margin-top: 10px;
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+    
+    /* Preview image */
+    .image-preview {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-top: 15px;
+      display: none;
+    }
+    
+    /* Modal Styles */
+    .modal-header {
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .modal-footer {
+      border-top: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Chart Container */
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+    
+    /* Responsive Styles */
+    @media (max-width: 992px) {
+      .admin-sidebar {
+        transform: translateX(-100%);
+        z-index: 1050;
+      }
+      
+      .sidebar-show .admin-sidebar {
+        transform: translateX(0);
+      }
+      
+      .admin-main {
+        margin-left: 0;
+      }
+      
+      .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1040;
+        display: none;
+      }
+      
+      .sidebar-show .sidebar-overlay {
+        display: block;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .admin-header {
+        padding: 0 15px;
+      }
+      
+      .admin-content {
+        padding: 15px;
+      }
+      
+      .stats-card .value {
+        font-size: 1.5rem;
+      }
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+    
+    /* Animation classes */
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Custom checkbox */
+    .custom-checkbox .form-check-input:checked {
+      background-color: var(--primary-purple);
+      border-color: var(--primary-purple);
+    }
+    
+    /* Status badges */
+    .badge-active {
+      background-color: rgba(40, 167, 69, 0.1);
+      color: #28a745;
+    }
+    
+    .badge-inactive {
+      background-color: rgba(220, 53, 69, 0.1);
+      color: #dc3545;
+    }
+    
+    .badge-pending {
+      background-color: rgba(255, 193, 7, 0.1);
+      color: #ffc107;
+    }
+    
+    /* Custom tabs */
+    .custom-tabs .nav-link {
+      color: #6c757d;
+      border: none;
+      padding: 10px 20px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+    
+    .custom-tabs .nav-link.active {
+      color: var(--primary-purple);
+      border-bottom: 2px solid var(--primary-purple);
+      background-color: transparent;
+    }
+    
+    .custom-tabs .nav-link:hover:not(.active) {
+      color: var(--primary-purple);
+    }
+    
+    /* Toast notification */
+    .toast-notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1100;
+      min-width: 300px;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+      display: none;
+    }
+    
+    .toast-header {
+      padding: 12px 15px;
+      border-bottom: none;
+    }
+    
+    .toast-body {
+      padding: 15px;
+    }
+    
+    /* ADMIN SPECIFIC STYLES */
+    .admin-panel {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    .admin-panel h3 {
+      color: var(--primary-purple);
+      border-bottom: 2px solid #f0f0f0;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .admin-table th {
+      background: var(--primary-purple);
+      color: white;
+      padding: 12px;
+      text-align: left;
+    }
+
+    .admin-table td {
+      padding: 12px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: middle;
+    }
+
+    .admin-table tr:hover {
+      background: rgba(138, 79, 255, 0.05);
+    }
+
+    .admin-table img {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 5px;
+    }
+
+    .admin-action-btn {
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      margin-right: 5px;
+    }
+
+    .btn-edit {
+      background: #ffc107;
+      color: #212529;
+      border: none;
+    }
+
+    .btn-delete {
+      background: #dc3545;
+      color: white;
+      border: none;
+    }
+
+    .btn-view {
+      background: #17a2b8;
+      color: white;
+      border: none;
+    }
+
+    .admin-form {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    .admin-form label {
+      font-weight: 600;
+      color: var(--primary-purple);
+      margin-bottom: 5px;
+    }
+
+    .admin-form .form-control {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 15px;
+    }
+
+    .admin-form .form-control:focus {
+      border-color: var(--primary-purple);
+      box-shadow: 0 0 0 0.2rem rgba(138, 79, 255, 0.25);
+    }
+
+    .ticket-price-input {
+      display: grid;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .ticket-price-input label {
+      min-width: 100px;
+      margin-bottom: 10;
+    }
+
+    .ticket-price-input input {
+      flex: 1;
+    }
+
+    .price-badge {
+      background: var(--primary-purple);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      margin-right: 5px;
+      display: inline-grid;
+      margin-bottom: 5px;
+    }
+
+    .ticket-stock-input {
+      display: grid;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .ticket-stock-input label {
+      min-width: 100px;
+      margin-bottom: 10;
+    }
+
+    .ticket-stock-input input {
+      flex: 1;
+    }
+
+    /*Atur layout isi tabel bagian stock*/
+    .stock-badge {
+      background: #6c757d;
+      color: white;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      margin-right: 5px;
+      display: inline-grid;
+      margin-bottom: 3px;
+    }
+
+    .preview-image {
+      max-width: 200px;
+      max-height: 200px;
+      margin-top: 10px;
+      border-radius: 5px;
+      display: none;
+    }
+
+    .admin-section-title {
+      color: var(--primary-purple);
+      margin: 30px 0 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .admin-nav-tabs .nav-link {
+      color: #666;
+      font-weight: 500;
+      border: none;
+      padding: 10px 20px;
+      margin-right: 5px;
+    }
+
+    .admin-nav-tabs .nav-link.active {
+      color: var(--primary-purple);
+      background: rgba(138, 79, 255, 0.1);
+      border-bottom: 2px solid var(--primary-purple);
+    }
+
+    .admin-nav-tabs .nav-link:hover:not(.active) {
+      color: var(--primary-purple);
+      background: rgba(138, 79, 255, 0.05);
+    }
+
+    .tab-content {
+      padding: 20px 0;
+    }
+
+    .admin-alert {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1100;
+      min-width: 300px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      opacity: 0;
+      transform: translateY(-20px);
+      transition: all 0.3s ease;
+    }
+
+    .admin-alert.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .form-section {
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 1px dashed #eee;
+    }
+
+    .form-section-title {
+      font-size: 1.1rem;
+      color: var(--primary-purple);
+      margin-bottom: 15px;
+    }
+
+    .image-upload-container {
+      border: 2px dashed #ddd;
+      border-radius: 5px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 15px;
+    }
+
+    .image-upload-container:hover {
+      border-color: var(--primary-purple);
+      background: rgba(138, 79, 255, 0.05);
+    }
+
+    .image-upload-container i {
+      font-size: 2rem;
+      color: var(--primary-purple);
+      margin-bottom: 10px;
+    }
+
+    .image-upload-container p {
+      margin-bottom: 0;
+      color: #666;
+    }
+
+    #imagePreview {
+      max-width: 100%;
+      max-height: 300px;
+      margin-top: 15px;
+      display: none;
+      border-radius: 5px;
+    }
+
+    /*Aniamasi agar navigasi navbar smooth*/
+    [id^="slider-section"], 
+    [id^="featured-section"], 
+    [id^="all-section"] {
+    scroll-margin-top: 30px; /* Adjust this value based on your header height */
+    transition: box-shadow 0.3s ease;
+    }
+
+    /* Active state for sidebar items */
+    .sidebar-nav .nav-item.active {
+    background: rgba(138, 79, 255, 0.1);
+    border-left: 3px solid var(--primary-purple);
+    color: white;
+    }
+
+    .sidebar-nav .nav-item.active .nav-icon {
+    color: var(--primary-purple);
+    }
+        /* Artist fields */
+        .artist-field {
+        background-color: rgba(138, 79, 255, 0.05);
+        border: 1px dashed rgba(138, 79, 255, 0.3) !important;
+    }
+
+    /* Location section */
+    .location-preview {
+        border: 1px solid #eee;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 10px;
+    }
+
+    /* View button */
+    .btn-view {
+        background: #17a2b8;
+        color: white;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-view:hover {
+        background: #138496;
+        transform: translateY(-2px);
+    }
+
+    .artist-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 15px;
+      margin-top: 10px;
+    }
+
+    .artist-item {
+      text-align: center;
+      padding: 10px;
+      border-radius: 8px;
+      background-color: rgba(138, 79, 255, 0.05);
+    }
+
+    .artist-image {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 50%;
+      margin-bottom: 8px;
+    }
+
+    .artist-name {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .facilities-list {
+      margin-top: 10px;
+    }
+
+    /* Leaflet map fixes */
+    .leaflet-container {
+      z-index: 0 !important;
+    }
+
+    .leaflet-control-attribution {
+      font-size: 10px;
+    }
+  </style>
+</head>
+
+
+<body class="admin-container">
+  <!-- Sidebar Overlay (Mobile) -->
+  <div class="sidebar-overlay"></div>
+  
+  <!-- Admin Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-brand">
+      <i class="bi bi-ticket-perforated sidebar-brand-icon"></i>
+      <span>ConcertTix</span>
+    </div>
+    
+    <div class="sidebar-nav">
+      <div class="nav-item active">
+        <i class="bi bi-speedometer2 nav-icon"></i>
+        <span class="nav-item-text">Dashboard</span>
+      </div>
+      
+      <div class="nav-item">
+        <i class="bi bi-images nav-icon"></i>
+        <span class="nav-item-text">Slider Management</span>
+      </div>
+      
+      <div class="nav-item">
+        <i class="bi bi-star-fill nav-icon"></i>
+        <span class="nav-item-text">Featured Concerts</span>
+      </div>
+      
+      <div class="nav-item">
+        <i class="bi bi-music-note-list nav-icon"></i>
+        <span class="nav-item-text">All Concerts</span>
+      </div>
+    </div>
+    
+    <div class="sidebar-footer">
+      <div class="user-avatar">AD</div>
+      <div class="sidebar-footer-text">
+        <div class="user-name">Admin User</div>
+        <div class="user-role">Super Admin</div>
+      </div>
+    </div>
+  </aside>
+  
+  <!-- Main Content -->
+  <main class="admin-main">
+    <!-- Admin Header -->
+    <header class="admin-header">
+      <div class="header-left">
+        <div class="sidebar-toggle">
+          <i class="bi bi-list"></i>
+        </div>
+        <h1 class="page-title">Dashboard</h1>
+      </div>
+      
+      <div class="header-right">
+        <a href="#" class="">
+          <button type="button" class="btn btn-danger btn-m">Logout</button>
+        </a>
+      </div>
+    </header>
+    
+    <!-- Admin Content -->
+    <div class="admin-content">
+      <!-- Stats Cards -->
+      <div class="row">
+        <div class="col-md-6 col-lg-3">
+          <div class="stats-card purple">
+            <i class="bi bi-ticket-perforated icon"></i>
+            <div class="value">1,254</div>
+            <div class="label">Total Concerts</div>
+          </div>
+        </div>
+        
+        <div class="col-md-6 col-lg-3">
+          <div class="stats-card green">
+            <i class="bi bi-cart icon"></i>
+            <div class="value">8,742</div>
+            <div class="label">Total Orders</div>
+          </div>
+        </div>
+        
+        <div class="col-md-6 col-lg-3">
+          <div class="stats-card blue">
+            <i class="bi bi-currency-dollar icon"></i>
+            <div class="value">$124,580</div>
+            <div class="label">Total Revenue</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slider Management Section -->
+      <section id="slider-section" class="mb-5">
+        <h2 class="admin-section-title">Slider Management</h2>
+        
+        <div class="admin-panel">
+          <h3>Current Slider Items</h3>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Image</th>
+                  <th>Title</th>
+                  <th>Genre</th>
+                  <th>Location</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="slider-table-body">
+                <!-- Slider items will be populated here by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="admin-form">
+          <h3>Add/Edit Slider Item</h3>
+          <form id="slider-form">
+            <input type="hidden" id="slider-id" value="">
+            
+            <div class="form-section">
+              <h5 class="form-section-title">Basic Information</h5>
+              <div class="row">
+                <div class="col-md-6">
+                  <label for="slider-title" class="form-label">Title</label>
+                  <input type="text" class="form-control" id="slider-title" required>
+                </div>
+                <div class="col-md-6">
+                  <label for="slider-genre" class="form-label">Genre</label>
+                  <input type="text" class="form-control" id="slider-genre" required>
+                </div>
+              </div>
+              <div class="row mt-3">
+                <div class="col-md-6">
+                  <label for="slider-location" class="form-label">Location</label>
+                  <input type="text" class="form-control" id="slider-location" required>
+                </div>
+               <!-- tambahkan satu kolom di sini -->
+              </div>
+              <div class="row mt-3">
+                <div class="col-md-12">
+                  <label for="slider-description" class="form-label">Description</label>
+                  <textarea class="form-control" id="slider-description" rows="3" required></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h5 class="form-section-title">Image</h5>
+              <div class="image-upload-container" id="slider-image-upload">
+                <i class="bi bi-image"></i>
+                <p>Click to upload slider image</p>
+                <input type="file" id="slider-image-input" accept="image/*" style="display: none;">
+                <img id="slider-image-preview" class="preview-image">
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-secondary me-2" onclick="resetSliderForm()">Reset</button>
+              <button type="submit" class="btn btn-purple">Save Slider</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Featured Concerts Section -->
+      <section id="featured-section" class="mb-5">
+        <h2 class="admin-section-title">Featured Concerts</h2>
+        
+        <div class="admin-panel">
+          <h3>Current Featured Concerts</h3>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Image</th>
+                  <th>Title</th>
+                  <th>Genre</th>
+                  <th>Venue</th>
+                  <th>Date</th>
+                  <th>Prices</th>
+                  <th>Stock</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="featured-table-body">
+                <!-- Featured concerts will be populated here by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="admin-form">
+          <h3>Add/Edit Featured Concert</h3>
+          <form id="featured-form">
+            <input type="hidden" id="featured-id" value="">
+            
+            <div class="form-section">
+              <h5 class="form-section-title">Basic Information</h5>
+              <div class="row">
+                <div class="col-md-6">
+                  <label for="featured-title" class="form-label">Title</label>
+                  <input type="text" class="form-control" id="featured-title" required>
+                </div>
+                <div class="col-md-6">
+                  <label for="featured-genre" class="form-label">Genre</label>
+                  <input type="text" class="form-control" id="featured-genre" required>
+                </div>
+              </div>
+              <div class="row mt-3">
+                <div class="col-md-6">
+                  <label for="featured-venue" class="form-label">Venue</label>
+                  <input type="text" class="form-control" id="featured-venue" required>
+                </div>
+                <div class="col-md-3">
+                  <label for="featured-day" class="form-label">Day</label>
+                  <input type="text" class="form-control" id="featured-day" placeholder="e.g., 15" required>
+                </div>
+                <div class="col-md-3">
+                  <label for="featured-month" class="form-label">Month</label>
+                  <input type="text" class="form-control" id="featured-month" placeholder="e.g., JUN" required>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-12">
+                  <label for="featured-description" class="form-label">Description</label>
+                  <textarea class="form-control" id="featured-description" rows="3" required></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h5 class="form-section-title">Ticket Prices</h5>
+
+              <div class="row mt-2">
+                <div class="col-md-5">
+                  <div class="ticket-price-input">
+                    <label for="featured-price-regular">Regular:</label>
+                    <input type="text" class="form-control" id="featured-price-regular" placeholder="Rp. xxx.xxx" required>
+                  </div>
+                </div>
+                <div class="col-md-5">
+                  <div class="ticket-stock-input">
+                    <label for="featured-stock-regular">Stock:</label>
+                    <input type="number" class="form-control" id="featured-stock-regular" placeholder="Enter Ticket Stock" required>
+                  </div>
+                </div>
+
+                <div class="col-md-5">
+                  <div class="ticket-price-input">
+                    <label for="featured-price-vip">VIP:</label>
+                    <input type="text" class="form-control" id="featured-price-vip" placeholder="Rp x.xxx.xxx" required>
+                  </div>
+                </div>
+                <div class="col-md-5">
+                  <div class="ticket-stock-input">
+                    <label for="featured-stock-vip">Stock:</label>
+                    <input type="number" class="form-control" id="featured-stock-regular" placeholder="Enter Ticket Stock" required>
+                  </div>
+                </div>
+
+                <div class="col-md-5">
+                  <div class="ticket-price-input">
+                    <label for="featured-price-platinum">Platinum:</label>
+                    <input type="text" class="form-control" id="featured-price-platinum" placeholder="Rp xx.xxx.xxx" required>
+                  </div>
+                </div>
+                <div class="col-md-5">
+                  <div class="ticket-stock-input">
+                    <label for="featured-stock-platinum">Stock:</label>
+                    <input type="number" class="form-control" id="featured-stock-platinum" placeholder="Enter Ticket Stock" required>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h5 class="form-section-title">Back Details</h5>
+              <div class="row">
+                <div class="col-md-4">
+                  <label for="featured-full-date" class="form-label">Full Date</label>
+                  <input type="text" class="form-control" id="featured-full-date" placeholder="e.g., Fri, Jun 15, 2024" required>
+                </div>
+                <div class="col-md-4">
+                  <label for="featured-time" class="form-label">Time</label>
+                  <input type="text" class="form-control" id="featured-time" placeholder="e.g., 8:30 PM" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+                <h5 class="form-section-title">Concert Details</h5>
+                <div class="row">
+                  <div class="col-md-12">
+                    <label for="featured-about" class="form-label">Description</label>
+                    <textarea class="form-control" id="featured-about" rows="5" required></textarea>
+                  </div>
+                </div>
+                <div class="form-section">
+                <h5 class="form-section-title">Artists</h5>
+                  <div id="featured-artists-container">
+                    <!-- Artists akan ditambahkan secara dinamis di sini -->
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-purple mt-2" onclick="addArtistField()">
+                    <i class="bi bi-plus"></i> Add Artist
+                  </button>
+                </div>
+                <div class="form-section">
+                <h5 class="form-section-title">Location Details</h5>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                      <label for="featured-venue-name" class="form-label">Venue Name</label>
+                      <input type="text" class="form-control" id="featured-venue-name" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="featured-address" class="form-label">Address</label>
+                      <input type="text" class="form-control" id="featured-address" required>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                  <div class="col-md-6">
+                    <label for="featured-map-link" class="form-label">Google Maps Link</label>
+                    <input type="url" class="form-control" id="featured-map-link">
+                  </div>
+                </div>
+                <div class="row mt-3">
+                  <div class="col-md-12">
+                    <label class="form-label">Facilities (comma separated)</label>
+                    <input type="text" class="form-control" id="featured-facilities" placeholder="Wheelchair accessible, Food stalls, etc">
+                  </div>
+                </div>
+              </div>
+
+            <div class="form-section">
+              <h5 class="form-section-title">Image</h5>
+              <div class="image-upload-container" id="featured-image-upload">
+                <i class="bi bi-image"></i>
+                <p>Click to upload concert image</p>
+                <input type="file" id="featured-image-input" accept="image/*" style="display: none;">
+                <img id="featured-image-preview" class="preview-image">
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-secondary me-2" onclick="resetFeaturedForm()">Reset</button>
+              <button type="submit" class="btn btn-purple">Save Concert</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- All Concerts Section -->
+      <section id="all-section" class="mb-5">
+        <h2 class="admin-section-title">All Concerts</h2>
+        
+        <div class="admin-panel">
+          <h3>Current Concerts</h3>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Image</th>
+                  <th>Title</th>
+                  <th>Genre</th>
+                  <th>Venue</th>
+                  <th>Date</th>
+                  <th>Prices</th>
+                  <th>Stock</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="all-table-body">
+                <!-- All concerts will be populated here by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="admin-form">
+          <h3>Add/Edit Concert</h3>
+          <form id="all-form">
+            <input type="hidden" id="all-id" value="">
+            
+            <div class="form-section">
+              <h5 class="form-section-title">Basic Information</h5>
+              <div class="row">
+                <div class="col-md-6">
+                  <label for="all-title" class="form-label">Title</label>
+                  <input type="text" class="form-control" id="all-title" required>
+                </div>
+                <div class="col-md-6">
+                  <label for="all-genre" class="form-label">Genre</label>
+                  <input type="text" class="form-control" id="all-genre" required>
+                </div>
+              </div>
+              <div class="row mt-3">
+                <div class="col-md-6">
+                  <label for="all-venue" class="form-label">Venue</label>
+                  <input type="text" class="form-control" id="all-venue" required>
+                </div>
+                <div class="col-md-3">
+                  <label for="all-day" class="form-label">Day</label>
+                  <input type="text" class="form-control" id="all-day" placeholder="e.g., 15" required>
+                </div>
+                <div class="col-md-3">
+                  <label for="all-month" class="form-label">Month</label>
+                  <input type="text" class="form-control" id="all-month" placeholder="e.g., JUN" required>
+                </div>
+              </div>
+              <div class="row mt-3">
+                <div class="col-md-12">
+                  <label for="all-description" class="form-label">Description</label>
+                  <textarea class="form-control" id="all-description" rows="3" required></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h5 class="form-section-title">Ticket Prices</h5>
+
+              <div class="row mt-2">
+                <div class="col-md-5">
+                  <div class="ticket-price-input">
+                    <label for="all-price-regular">Regular:</label>
+                    <input type="text" class="form-control" id="all-price-regular" placeholder="Rp 500.000" required>
+                  </div>
+                </div>
+                <div class="col-md-5">
+                  <div class="ticket-stock-input">
+                    <label for="all-price-regular">Stock:</label>
+                    <input type="number" class="form-control" id="all-stock-regular" placeholder="Enter Ticket Stock" required>
+                  </div>
+                </div>
+
+                <div class="col-md-5">
+                  <div class="ticket-price-input">
+                    <label for="all-price-vip">VIP:</label>
+                    <input type="text" class="form-control" id="all-price-vip" placeholder="Rp 1.000.000" required>
+                  </div>
+                </div>
+                <div class="col-md-5">
+                  <div class="ticket-stock-input">
+                    <label for="all-price-regular">Stock:</label>
+                    <input type="number" class="form-control" id="all-stock-vip" placeholder="Enter Ticket Stock" required>
+                  </div>
+                </div>
+
+                <div class="col-md-5">
+                  <div class="ticket-price-input">
+                    <label for="all-price-platinum">Platinum:</label>
+                    <input type="text" class="form-control" id="all-price-platinum" placeholder="Rp 1.500.000" required>
+                  </div>
+                </div>
+                <div class="col-md-5">
+                  <div class="ticket-price-input">
+                    <label for="all-price-regular">Stock:</label>
+                    <input type="number" class="form-control" id="all-stock-platinum" placeholder="Enter Ticket Stock" required>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="form-section">
+              <h5 class="form-section-title">Back Details</h5>
+              <div class="row">
+                <div class="col-md-4">
+                  <label for="all-full-date" class="form-label">Full Date</label>
+                  <input type="text" class="form-control" id="all-full-date" placeholder="e.g., Fri, Jun 15, 2024" required>
+                </div>
+                <div class="col-md-4">
+                  <label for="all-time" class="form-label">Time</label>
+                  <input type="text" class="form-control" id="all-time" placeholder="e.g., 8:30 PM" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h5 class="form-section-title">Concert Details</h5>
+                <div class="row">
+                  <div class="col-md-12">
+                    <label for="all-about" class="form-label">Description</label>
+                    <textarea class="form-control" id="all-about" rows="5" required></textarea>
+                  </div>
+                </div>
+                <div class="form-section">
+                <h5 class="form-section-title">Artists</h5>
+                  <div id="all-artists-container">
+                    <!-- Artists akan ditambahkan secara dinamis di sini -->
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-purple mt-2" onclick="addArtistField()">
+                    <i class="bi bi-plus"></i> Add Artist
+                  </button>
+                </div>
+                <div class="form-section">
+                <h5 class="form-section-title">Location Details</h5>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                      <label for="all-venue-name" class="form-label">Venue Name</label>
+                      <input type="text" class="form-control" id="all-venue-name" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="all-address" class="form-label">Address</label>
+                      <input type="text" class="form-control" id="all-address" required>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                  <div class="col-md-6">
+                    <label for="all-map-link" class="form-label">Google Maps Link</label>
+                    <input type="url" class="form-control" id="all-map-link">
+                  </div>
+                </div>
+                <div class="row mt-3">
+                  <div class="col-md-12">
+                    <label class="form-label">Facilities (comma separated)</label>
+                    <input type="text" class="form-control" id="all-facilities" placeholder="Wheelchair accessible, Food stalls, etc">
+                  </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+              <h5 class="form-section-title">Image</h5>
+              <div class="image-upload-container" id="all-image-upload">
+                <i class="bi bi-image"></i>
+                <p>Click to upload concert image</p>
+                <input type="file" id="all-image-input" accept="image/*" style="display: none;">
+                <img id="all-image-preview" class="preview-image">
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-secondary me-2" onclick="resetAllForm()">Reset</button>
+              <button type="submit" class="btn btn-purple">Save Concert</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Admin Alert (hidden by default) -->
+  <div class="admin-alert alert alert-success alert-dismissible fade show" role="alert">
+    <strong>Success!</strong> Your changes have been saved.
+    <button type="button" class="btn-close" onclick="hideAlert()"></button>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  
+  <!-- DataTables JS -->
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  
+  <!-- Custom Scripts -->
+  <script>
+    // Data structure to hold all concert and slider data
+    const adminData = {
+      sliders: [
+        {
+          id: 1,
+          image: "https://i.pinimg.com/736x/bc/af/9b/bcaf9bfe50f2e039edbfcd7c191df4b6.jpg",
+          title: "Coldplay Music of the Spheres World Tour",
+          genre: "Pop Rock",
+          location: "Gelora Bung Karno",
+          description: "Experience the magical performance of Coldplay with their spectacular light show and greatest hits collection."
+        },
+        {
+          id: 2,
+          image: "https://i.pinimg.com/736x/04/a6/b0/04a6b06634ce8b9c7a9cfabcfc395dc9.jpg",
+          title: "Blackpink Born Pink World Tour",
+          genre: "K-Pop",
+          location: "Indonesia Convention Exhibition",
+          description: "The most popular K-Pop girl group brings their world tour with stunning choreography and powerful performances."
+        },
+        {
+          id: 3,
+          image: "https://i.pinimg.com/736x/1e/ff/0f/1eff0f05d84c1d09f97cf11f962f0fc1.jpg",
+          title: "Ed Sheeran Mathematics Tour",
+          genre: "Pop",
+          location: "Jakarta International Stadium",
+          description: "Ed Sheeran's one-man show with his loop pedal will amaze you with his musical genius and heartfelt songs."
+        }
+      ],
+      featured: [
+        {
+          id: 1,
+          image: "https://i.pinimg.com/736x/69/54/76/69547689b3fb38d77c3c83abf3ef15ca.jpg",
+          title: "Arctic Monkeys World Tour",
+          genre: "Indie Rock",
+          venue: "Univ Amikom YK",
+          date: { day: "7", month: "JUN" },
+          
+          description: "The Arctic Monkeys bring their unique sound to Yogyakarta in this highly anticipated tour.",
+          backDetails: {
+            date: "Fri, Jun 7, 2024",
+            time: "8:30 PM",
+            venue: "JIS"
+          },
+          prices: {
+            regular: "Rp 800.000",
+            vip: "Rp 1.200.000",
+            platinum: "Rp 1.800.000"
+          },
+          stocks: {
+            regular: 150,
+            vip: 50,
+            platinum: 20
+          },
+          about: "Join Arctic Monkeys for an electrifying night on their global tour, delivering unforgettable hits and mesmerizing performances!",
+          artists: [
+            { name: "Arctic Monkeys", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQBtVRjc99sop_r6a0LGqVoIn9MplBqGdWL1g&s" }
+          ],
+          location: {
+            venue: "Universitas Amikom Yogyakartaa",
+            address: "Jl. Ring Road Utara, Ngringin, Condongcatur, Kec. Depok, Kabupaten Sleman, Daerah Istimewa Yogyakarta",
+            mapLink: "https://maps.app.goo.gl/11tGFV75VA9Hs3cN9",
+            facilities: ["Wheelchair accessible", "Food stalls", "Merchandise stands"]
+          }
+        },
+        {
+          id: 2,
+          image: "https://i.pinimg.com/736x/6f/7f/a6/6f7fa6e93a38388f52f7bfd070e1f512.jpg",
+          title: "The Weeknd",
+          genre: "R&B",
+          venue: "Tugu Jogja",
+          date: { day: "15", month: "JUL" },
+          price: "Rp 1.600.000",
+          description: "Experience The Weeknd's mesmerizing performance from his critically acclaimed album.",
+          backDetails: {
+            date: "Sat, Jul 15, 2024",
+            time: "9:00 PM",
+            venue: "GBK"
+          },
+          prices: {
+            regular: "Rp 1.000.000",
+            vip: "Rp 1.500.000",
+            platinum: "Rp 2.200.000"
+          },
+          stocks: {
+            regular: 350,
+            vip: 100,
+            platinum: 50
+          },
+          about: "Experience The Weeknd live in concert – a dazzling show of chart-topping anthems and mesmerizing stage production!",
+          artists: [
+            { name: "The Weeknd", image: "https://i.pinimg.com/736x/9e/11/7f/9e117fb800d99157c91a2344c5321ea6.jpg" }
+          ],
+          location: {
+            venue: "Tugu Jogja",
+            address: "Jl. Jend. Sudirman, Gowongan, Kec. Jetis, Kota Yogyakarta, Daerah Istimewa Yogyakarta",
+            mapLink: "https://maps.app.goo.gl/e3Y4mcGoWd22JXA79",
+            facilities: ["Wheelchair accessible", "Food stalls", "Merchandise stands"]
+          }
+        }
+      ],
+      all: [
+        {
+          id: 1,
+          image: "https://i.pinimg.com/736x/18/14/ed/1814ed542120118f8e52b09f0fec9343.jpg",
+          title: "Bruno Mars",
+          genre: "Pop, R&B",
+          venue: "Tugu Jogja",
+          date: { day: "12", month: "OCT" },
+          price: "Rp 1.800.000",
+          description: "Bruno Mars brings his signature style and high-energy performance to Jakarta.",
+          backDetails: {
+            date: "Sat, Oct 12, 2024",
+            time: "8:30 PM",
+            venue: "GBK"
+          },
+          prices: {
+            regular: "Rp 1.000.000",
+            vip: "Rp 1.600.000",
+            platinum: "Rp 2.200.000"
+          },
+          stocks: {
+            regular: 100,
+            vip: 50,
+            platinum: 20
+          },
+          about: "See Bruno Mars live – an unforgettable concert experience filled with charm, charisma, and hit after hit!",
+          artists: [
+            { name: "Bruno Mars", image: "https://i.pinimg.com/736x/b0/b7/f0/b0b7f0df94169abb5c84c97fe6202ae8.jpg" }
+          ],
+          location: {
+            venue: "Tugu Jogja",
+            address: "Jl. Jend. Sudirman, Gowongan, Kec. Jetis, Kota Yogyakarta, Daerah Istimewa Yogyakarta",
+            mapLink: "https://maps.app.goo.gl/e3Y4mcGoWd22JXA79",
+            facilities: ["Wheelchair accessible", "Food stalls", "Merchandise stands"]
+          }
+        },
+        {
+          id: 2,
+          image: "https://i.pinimg.com/736x/d6/6c/b6/d66cb6c41f3cd9fa1589c978899d1f48.jpg",
+          title: "Post Malone Twelve Carat",
+          genre: "Hip-Hop, Pop",
+          venue: "GBK",
+          date: { day: "18", month: "NOV" },
+          price: "Rp 1.700.000",
+          description: "Post Malone's unique blend of hip-hop and rock comes to Jakarta.",
+          backDetails: {
+            date: "Mon, Nov 18, 2024",
+            time: "9:00 PM",
+            venue: "JIS"
+          },
+          prices: {
+            regular: "Rp 900.000",
+            vip: "Rp 1.400.000",
+            platinum: "Rp 2.000.000"
+          },
+          stocks: {
+            regular: 80,
+            vip: 20,
+            platinum: 10
+          },
+          about: "Don’t miss Post Malone live in concert – an explosive mix of hip-hop, rock, and genre-defying hits that will blow you away!",
+          artists: [
+            { name: "Post Malone", image: "https://i.pinimg.com/736x/10/c2/4c/10c24c3592d14e9ef4e135cd4d75f194.jpg" }
+          ],
+          location: {
+            venue: "Stadion Gelora Bung Karno",
+            address: "Jl. Pintu Satu Senayan, Gelora, Kecamatan Tanah Abang, Kota Jakarta Pusat, Daerah Khusus Ibukota Jakarta",
+            mapLink: "https://maps.app.goo.gl/6FH9Vx6AounELKZ59",
+            facilities: ["Wheelchair accessible", "Food stalls", "Merchandise stands"]
+          }
+        },
+        {
+          id: 3,
+          image: "https://i.pinimg.com/736x/b0/8f/b5/b08fb55a89849220d1992bd353f33d02.jpg",
+          title: "Ariana Grande Sweetener",
+          genre: "Pop",
+          venue: "ICE BSD",
+          date: { day: "3", month: "DEC" },
+          price: "Rp 1.900.000",
+          description: "Ariana Grande's powerful vocals and stunning visuals in an unforgettable show.",
+          backDetails: {
+            date: "Tue, Dec 3, 2024",
+            time: "8:00 PM",
+            venue: "ICE BSD"
+          },
+          prices: {
+            regular: "Rp 1.100.000",
+            vip: "Rp 1.700.000",
+            platinum: "Rp 2.300.000"
+          },
+          stocks: {
+            regular: 200,
+            vip: 80,
+            platinum: 20
+          },
+          about: "Yuh! Don’t miss Ariana Grande’s world tour – a glittering mix of R&B grooves, pop anthems, and legendary whistle tones!",
+          artists: [
+            { name: "Ariana Grande", image: "https://i.pinimg.com/736x/58/50/f5/5850f592c6e3c162bbd38ce5fc9b134f.jpg" }
+          ],
+          location: {
+            venue: "Indonesia Convention Exhibition (ICE) BSD City",
+            address: "Jl. BSD Grand Boulevard No.1, Pagedangan, Kec. Pagedangan, Kabupaten Tangerang, Banten",
+            mapLink: "https://maps.app.goo.gl/gnnUzaJaWCmyghnf6",
+            facilities: ["Wheelchair accessible", "Food stalls", "Merchandise stands"]
+          }
+        }
+      ]
+    };
+
+    // Initialize the admin panel
+    document.addEventListener('DOMContentLoaded', function() {
+      // Load all data
+      loadSliders();
+      loadFeaturedConcerts();
+      loadAllConcerts();
+      
+      // Setup form submissions
+      setupFormHandlers();
+      
+      // Setup image upload previews
+      setupImageUploads();
+      
+      // Navbar scroll effect
+      window.addEventListener('scroll', function() {
+        const navbar = document.querySelector('.navbar');
+        if (window.scrollY > 50) {
+          navbar.classList.add('scrolled');
+        } else {
+          navbar.classList.remove('scrolled');
+        }
+      });
+      
+      // Toggle sidebar
+      $('.sidebar-toggle').click(function() {
+        $('body').toggleClass('sidebar-collapsed');
+      });
+      
+      // Mobile sidebar toggle
+      $('.sidebar-toggle').click(function() {
+        $('body').toggleClass('sidebar-show');
+      });
+      
+      $('.sidebar-overlay').click(function() {
+        $('body').removeClass('sidebar-show');
+      });
+      
+      // Set active nav item
+      $('.nav-item').click(function() {
+        $('.nav-item').removeClass('active');
+        $(this).addClass('active');
+      });
+      
+      // Initialize DataTable
+      $('.admin-table').DataTable({
+        responsive: true,
+        dom: '<"top"f>rt<"bottom"lip><"clear">',
+        language: {
+          search: "_INPUT_",
+          searchPlaceholder: "Search..."
+        }
+      });
+    });
+
+    // CRUD field artist
+    function addArtistField(artist = { name: '', image: '' }) {
+        const container = document.getElementById('featured-artists-container');
+        const artistId = Date.now();
+  
+        const artistDiv = document.createElement('div');
+        artistDiv.className = 'artist-field mb-3 p-3 border rounded';
+        artistDiv.dataset.id = artistId;
+  
+        artistDiv.innerHTML = `
+        <div class="row">
+            <div class="col-md-5">
+                <label class="form-label">Artist Name</label>
+                    <input type="text" class="form-control artist-name" 
+                    value="${artist.name}" placeholder="Artist name" required>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Image URL</label>
+                <input type="url" class="form-control artist-image" 
+                value="${artist.image}" placeholder="Image URL">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-sm btn-danger w-100" 
+                    onclick="removeArtistField('${artistId}')"><i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+        `;
+        container.appendChild(artistDiv);
+    }
+
+    function removeArtistField(id) {
+        const field = document.querySelector(`.artist-field[data-id="${id}"]`);
+        if (field) {
+            field.remove();
+        }
+    }
+
+    function loadArtists(artists) {
+        const container = document.getElementById('featured-artists-container');
+        container.innerHTML = '';
+  
+        if (artists && artists.length > 0) {
+            artists.forEach(artist => {
+            addArtistField(artist);
+            });
+        }
+    }
+
+    // See the detailed view displayed and everything
+    function featuredviewConcertDetails(id) {
+    const concert = adminData.featured.find(c => c.id == id) || adminData.all.find(c => c.id == id);
+    if (!concert) return;
+
+    // Create modal dynamically
+    const modalHtml = `
+    <div class="modal fade" id="concertDetailModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog concert-modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">${concert.title}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row">
+              <div class="col-md-4">
+                <img src="${concert.image}" class="img-fluid rounded mb-3" alt="${concert.title}">
+                <div class="concert-info">
+                  <p><strong>Genre:</strong> ${concert.genre}</p>
+                  <p><strong>Date:</strong> ${concert.backDetails?.date || 'N/A'}</p>
+                  <p><strong>Time:</strong> ${concert.backDetails?.time || 'N/A'}</p>
+                </div>
+                
+                <div class="ticket-info mt-3">
+                  <h6>Ticket Prices:</h6>
+                  <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      Regular
+                      <span class="badge bg-primary rounded-pill">${concert.prices?.regular || 'N/A'}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      VIP
+                      <span class="badge bg-primary rounded-pill">${concert.prices?.vip || 'N/A'}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      Platinum
+                      <span class="badge bg-primary rounded-pill">${concert.prices?.platinum || 'N/A'}</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div class="col-md-8">
+                <h5>About the Event</h5>
+                <p>${concert.about || 'No description available'}</p>
+                
+                ${concert.artists?.length ? `
+                <h5 class="mt-3">Featured Artists</h5>
+                <div class="artist-grid">
+                  ${concert.artists.map(artist => `
+                    <div class="artist-item">
+                      ${artist.image ? `<img src="${artist.image}" alt="${artist.name}" class="artist-image">` : ''}
+                      <span class="artist-name">${artist.name}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                ` : ''}
+                
+                <h5 class="mt-3">Location</h5>
+                <p><i class="bi bi-geo-alt"></i> <strong>${concert.location?.venue || 'Venue not specified'}</strong></p>
+                <p>${concert.location?.address || ''}</p>
+                
+                <div id="concertMap"></div>
+                
+                ${concert.location?.mapLink ? `
+                <div class="mt-2">
+                  <a href="${concert.location.mapLink}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-map"></i> Open in Google Maps
+                  </a>
+                </div>
+                ` : ''}
+                
+                ${concert.location?.facilities?.length ? `
+                <h5 class="mt-3">Facilities</h5>
+                <div class="facilities-list">
+                  ${concert.location.facilities.map(facility => `
+                    <span class="badge bg-light text-dark me-1">${facility}</span>
+                  `).join('')}
+                </div>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    `;
+  
+    // Add modal to DOM
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+  
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('concertDetailModal'));
+    modal.show();
+  
+    // Initialize map after modal is shown
+    document.getElementById('concertDetailModal').addEventListener('shown.bs.modal', function() {
+    initConcertMap(concert);
+    });
+  
+    // Remove modal after close
+    document.getElementById('concertDetailModal').addEventListener('hidden.bs.modal', function() {
+    this.remove();
+    });
+  }
+
+    function allviewConcertDetails(id) {
+    const concert = adminData.all.find(c => c.id == id) || adminData.all.find(c => c.id == id);
+    if (!concert) return;
+
+    // Create modal dynamically
+    const modalHtml = `
+    <div class="modal fade" id="concertDetailModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog concert-modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">${concert.title}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row">
+              <div class="col-md-4">
+                <img src="${concert.image}" class="img-fluid rounded mb-3" alt="${concert.title}">
+                <div class="concert-info">
+                  <p><strong>Genre:</strong> ${concert.genre}</p>
+                  <p><strong>Date:</strong> ${concert.backDetails?.date || 'N/A'}</p>
+                  <p><strong>Time:</strong> ${concert.backDetails?.time || 'N/A'}</p>
+                </div>
+                
+                <div class="ticket-info mt-3">
+                  <h6>Ticket Prices:</h6>
+                  <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      Regular
+                      <span class="badge bg-primary rounded-pill">${concert.prices?.regular || 'N/A'}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      VIP
+                      <span class="badge bg-primary rounded-pill">${concert.prices?.vip || 'N/A'}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      Platinum
+                      <span class="badge bg-primary rounded-pill">${concert.prices?.platinum || 'N/A'}</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div class="col-md-8">
+                <h5>About the Event</h5>
+                <p>${concert.about || 'No description available'}</p>
+                
+                ${concert.artists?.length ? `
+                <h5 class="mt-3">Featured Artists</h5>
+                <div class="artist-grid">
+                  ${concert.artists.map(artist => `
+                    <div class="artist-item">
+                      ${artist.image ? `<img src="${artist.image}" alt="${artist.name}" class="artist-image">` : ''}
+                      <span class="artist-name">${artist.name}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                ` : ''}
+                
+                <h5 class="mt-3">Location</h5>
+                <p><i class="bi bi-geo-alt"></i> <strong>${concert.location?.venue || 'Venue not specified'}</strong></p>
+                <p>${concert.location?.address || ''}</p>
+                
+                <div id="concertMap"></div>
+                
+                ${concert.location?.mapLink ? `
+                <div class="mt-2">
+                  <a href="${concert.location.mapLink}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-map"></i> Open in Google Maps
+                  </a>
+                </div>
+                ` : ''}
+                
+                ${concert.location?.facilities?.length ? `
+                <h5 class="mt-3">Facilities</h5>
+                <div class="facilities-list">
+                  ${concert.location.facilities.map(facility => `
+                    <span class="badge bg-light text-dark me-1">${facility}</span>
+                  `).join('')}
+                </div>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    `;
+  
+    // Add modal to DOM
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+  
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('concertDetailModal'));
+    modal.show();
+  
+    // Initialize map after modal is shown
+    document.getElementById('concertDetailModal').addEventListener('shown.bs.modal', function() {
+    initConcertMap(concert);
+    });
+  
+    // Remove modal after close
+    document.getElementById('concertDetailModal').addEventListener('hidden.bs.modal', function() {
+    this.remove();
+    });
+  }
+
+    // Map initialization
+    function initConcertMap(concert) {
+    // Default coordinates (Jakarta)
+      let lat = -6.2088;
+      let lng = 106.8456;
+  
+      // Try to extract coordinates from Google Maps link
+      if (concert.location?.mapLink) {
+      const match = concert.location.mapLink.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (match) {
+          lat = parseFloat(match[1]);
+          lng = parseFloat(match[2]);
+        }
+      }
+  
+      // Initialize map
+      const map = L.map('concertMap').setView([lat, lng], 15);
+  
+      // Add tile layer (OpenStreetMap)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+  
+      // Add marker
+      const marker = L.marker([lat, lng]).addTo(map)
+      .bindPopup(`<b>${concert.location?.venue || 'Venue'}</b><br>${concert.location?.address || ''}`);
+  
+      // Add custom icon if needed
+      const venueIcon = L.icon({
+        iconUrl: 'path/to/icon.png',
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
+      });
+      L.marker([lat, lng], {icon: venueIcon}).addTo(map);
+    }
+
+    // Load sliders into the table
+    function loadSliders() {
+      const tableBody = document.getElementById('slider-table-body');
+      tableBody.innerHTML = '';
+      
+      adminData.sliders.forEach(slider => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><img src="${slider.image}" alt="${slider.title}" style="width: 80px; height: 50px; object-fit: cover;"></td>
+          <td>${slider.title}</td>
+          <td>${slider.genre}</td>
+          <td>${slider.location}</td>
+          <td>
+            <button class="btn btn-edit admin-action-btn" onclick="editSlider(${slider.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-delete admin-action-btn" onclick="deleteSlider(${slider.id})"><i class="bi bi-trash"></i></button>
+          </td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    // Load featured concerts into the table
+    function loadFeaturedConcerts() {
+      const tableBody = document.getElementById('featured-table-body');
+      tableBody.innerHTML = '';
+      
+      adminData.featured.forEach(concert => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><img src="${concert.image}" alt="${concert.title}" style="width: 60px; height: 60px; object-fit: cover;"></td>
+          <td>${concert.title}</td>
+          <td>${concert.genre}</td>
+          <td>${concert.venue}</td>
+          <td>${concert.date.day} ${concert.date.month}</td>
+          <td>
+            <span class="price-badge">Regular: ${concert.prices.regular}</span>
+            <span class="price-badge">VIP: ${concert.prices.vip}</span>
+            <span class="price-badge">Platinum: ${concert.prices.platinum}</span>
+          </td>
+          <td>
+            <span class="stock-badge">Regular: ${concert.stocks?.regular}</span>
+            <span class="stock-badge">VIP: ${concert.stocks?.vip}</span>
+            <span class="stock-badge">Platinum: ${concert.stocks?.platinum}</span>
+          </td>
+          <td>
+            <button class="btn btn-view admin-action-btn" onclick="featuredviewConcertDetails(${concert.id})"><i class="bi bi-eye"></i> View</button>
+            <button class="btn btn-edit admin-action-btn" onclick="editFeatured(${concert.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-delete admin-action-btn" onclick="deleteFeatured(${concert.id})"><i class="bi bi-trash"></i></button>
+          </td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    // Load all concerts into the table
+    function loadAllConcerts() {
+    const tableBody = document.getElementById('all-table-body');
+    tableBody.innerHTML = '';
+  
+    adminData.all.forEach(concert => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+          <td><img src="${concert.image}" alt="${concert.title}" style="width: 60px; height: 60px; object-fit: cover;"></td>
+          <td>${concert.title}</td>
+          <td>${concert.genre}</td>
+          <td>${concert.venue}</td>
+          <td>${concert.date.day} ${concert.date.month}</td>
+          <td>
+            <span class="price-badge">Regular: ${concert.prices.regular}</span>
+            <span class="price-badge">VIP: ${concert.prices.vip}</span>
+            <span class="price-badge">Platinum: ${concert.prices.platinum}</span>
+          </td>
+          <td>
+            <span class="stock-badge">Regular: ${concert.stocks?.regular || 0}</span>
+            <span class="stock-badge">VIP: ${concert.stocks?.vip || 0}</span>
+            <span class="stock-badge">Platinum: ${concert.stocks?.platinum || 0}</span>
+          </td>
+          <td>
+            <button class="btn btn-view admin-action-btn" onclick="allviewConcertDetails(${concert.id})"><i class="bi bi-eye"></i> View</button>
+            <button class="btn btn-edit admin-action-btn" onclick="editAllConcert(${concert.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-delete admin-action-btn" onclick="deleteAllConcert(${concert.id})"><i class="bi bi-trash"></i></button>
+          </td>
+       `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    // Setup form submission handlers
+    function setupFormHandlers() {
+      // Slider form
+      document.getElementById('slider-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveSlider();
+      });
+      
+      // Featured form
+      document.getElementById('featured-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveFeatured();
+      });
+      
+      // All concerts form
+      document.getElementById('all-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveAllConcert();
+      });
+    }
+
+    // Setup image upload previews
+    function setupImageUploads() {
+      // Slider image upload
+      document.getElementById('slider-image-upload').addEventListener('click', function() {
+        document.getElementById('slider-image-input').click();
+      });
+      
+      document.getElementById('slider-image-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function(event) {
+            const preview = document.getElementById('slider-image-preview');
+            preview.src = event.target.result;
+            preview.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+      
+      // Featured image upload
+      document.getElementById('featured-image-upload').addEventListener('click', function() {
+        document.getElementById('featured-image-input').click();
+      });
+      
+      document.getElementById('featured-image-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function(event) {
+            const preview = document.getElementById('featured-image-preview');
+            preview.src = event.target.result;
+            preview.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+      
+      // All concerts image upload
+      document.getElementById('all-image-upload').addEventListener('click', function() {
+        document.getElementById('all-image-input').click();
+      });
+      
+      document.getElementById('all-image-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function(event) {
+            const preview = document.getElementById('all-image-preview');
+            preview.src = event.target.result;
+            preview.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    // Slider CRUD operations
+    function saveSlider() {
+      const id = document.getElementById('slider-id').value;
+      const title = document.getElementById('slider-title').value;
+      const genre = document.getElementById('slider-genre').value;
+      const location = document.getElementById('slider-location').value;
+      const description = document.getElementById('slider-description').value;
+      
+      // Get image (either existing or new)
+      let image = '';
+      const imageInput = document.getElementById('slider-image-input');
+      if (imageInput.files.length > 0) {
+        // In a real app, you would upload the image and get a URL
+        // For demo, we'll use a fake URL
+        image = URL.createObjectURL(imageInput.files[0]);
+      } else {
+        // Find existing image if editing
+        if (id) {
+          const existingSlider = adminData.sliders.find(s => s.id == id);
+          if (existingSlider) image = existingSlider.image;
+        }
+      }
+      
+      if (!image) {
+        alert('Please upload an image');
+        return;
+      }
+      
+      const sliderData = {
+        id: id || Math.max(...adminData.sliders.map(s => s.id), 0) + 1,
+        image,
+        title,
+        genre,
+        location,
+        description
+      };
+      
+      if (id) {
+        // Update existing slider
+        const index = adminData.sliders.findIndex(s => s.id == id);
+        if (index !== -1) {
+          adminData.sliders[index] = sliderData;
+        }
+      } else {
+        // Add new slider
+        adminData.sliders.push(sliderData);
+      }
+      
+      // Reset form and reload data
+      resetSliderForm();
+      loadSliders();
+      showAlert('Slider saved successfully!');
+    }
+
+    function editSlider(id) {
+      const slider = adminData.sliders.find(s => s.id == id);
+      if (!slider) return;
+      
+      document.getElementById('slider-id').value = slider.id;
+      document.getElementById('slider-title').value = slider.title;
+      document.getElementById('slider-genre').value = slider.genre;
+      document.getElementById('slider-location').value = slider.location;
+      document.getElementById('slider-description').value = slider.description;
+      
+      const preview = document.getElementById('slider-image-preview');
+      preview.src = slider.image;
+      preview.style.display = 'block';
+      
+      // Scroll to form
+      document.getElementById('slider-form').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function deleteSlider(id) {
+      if (confirm('Are you sure you want to delete this slider item?')) {
+        adminData.sliders = adminData.sliders.filter(s => s.id != id);
+        loadSliders();
+        showAlert('Slider deleted successfully!');
+      }
+    }
+
+    function resetSliderForm() {
+      document.getElementById('slider-form').reset();
+      document.getElementById('slider-id').value = '';
+      document.getElementById('slider-image-preview').style.display = 'none';
+      document.getElementById('slider-image-input').value = '';
+    }
+
+    // Featured Concerts CRUD operations
+    function saveFeatured() {
+      const id = document.getElementById('featured-id').value;
+      const title = document.getElementById('featured-title').value;
+      const genre = document.getElementById('featured-genre').value;
+      const venue = document.getElementById('featured-venue').value;
+      const day = document.getElementById('featured-day').value;
+      const month = document.getElementById('featured-month').value;
+      const description = document.getElementById('featured-description').value;
+
+      // Price and Stock
+      const regularPrice = document.getElementById('featured-price-regular').value;
+      const vipPrice = document.getElementById('featured-price-vip').value;
+      const platinumPrice = document.getElementById('featured-price-platinum').value;
+      const regularStock = document.getElementById('featured-stock-regular').value;
+      const vipStock = document.getElementById('featured-stock-vip').value;
+      const platinumStock = document.getElementById('featured-stock-platinum').value;
+
+      // Back Details
+      const fullDate = document.getElementById('featured-full-date').value;
+      const time = document.getElementById('featured-time').value;
+
+      // About
+      const about = document.getElementById('featured-about').value;
+  
+      // Location
+      const address = document.getElementById('featured-address').value;
+      const mapLink = document.getElementById('featured-map-link').value;
+      const facilities = document.getElementById('featured-facilities').value.split(',').map(f => f.trim());
+  
+      // Artists
+      const artistFields = document.querySelectorAll('.artist-field');
+      const artists = Array.from(artistFields).map(field => ({
+        name: field.querySelector('.artist-name').value,
+        image: field.querySelector('.artist-image').value
+      }));
+            
+      // Get image (either existing or new)
+      let image = '';
+      const imageInput = document.getElementById('featured-image-input');
+      if (imageInput.files.length > 0) {
+        // In a real app, you would upload the image and get a URL
+        // For demo, we'll use a fake URL
+        image = URL.createObjectURL(imageInput.files[0]);
+      } else {
+        // Find existing image if editing
+        if (id) {
+          const existingConcert = adminData.featured.find(c => c.id == id);
+          if (existingConcert) image = existingConcert.image;
+        }
+      }
+      
+      if (!image) {
+        alert('Please upload an image');
+        return;
+      }
+      
+      const concertData = {
+        id: id || Math.max(...adminData.featured.map(c => c.id), 0) + 1,
+        image,
+        title,
+        genre,
+        venue,
+        date: { day, month },
+        description,
+        backDetails: {
+          date: fullDate,
+          time,
+          venue
+        },
+        price: platinumPrice, // Using platinum as the displayed price
+        prices: {
+          regular: regularPrice,
+          vip: vipPrice,
+          platinum: platinumPrice
+        },
+        stocks: {
+          regular: regularStock,
+          vip: vipStock,
+          platinum: platinumStock
+        },
+        about,
+        artists,
+        location: {
+          venue,
+          address,
+          mapLink,
+          facilities
+        }
+      };
+      
+      if (id) {
+        // Update existing concert
+        const index = adminData.featured.findIndex(c => c.id == id);
+        if (index !== -1) {
+          adminData.featured[index] = concertData;
+        }
+      } else {
+        // Add new concert
+        adminData.featured.push(concertData);
+      }
+      
+      // Reset form and reload data
+      resetFeaturedForm();
+      loadFeaturedConcerts();
+      showAlert('Featured concert saved successfully!');
+    }
+
+    function editFeatured(id) {
+      const concert = adminData.featured.find(c => c.id == id);
+      if (!concert) return;
+      
+      document.getElementById('featured-id').value = concert.id;
+      document.getElementById('featured-title').value = concert.title;
+      document.getElementById('featured-genre').value = concert.genre;
+      document.getElementById('featured-venue').value = concert.venue;
+      document.getElementById('featured-day').value = concert.date.day;
+      document.getElementById('featured-month').value = concert.date.month;
+      document.getElementById('featured-description').value = concert.description;
+
+      // Price and Stock
+      document.getElementById('featured-price-regular').value = concert.prices.regular;
+      document.getElementById('featured-price-vip').value = concert.prices.vip;
+      document.getElementById('featured-price-platinum').value = concert.prices.platinum;
+      document.getElementById('featured-regular').value = concert.stocks?.regular;
+      document.getElementById('featured-vip').value = concert.stocks?.vip;
+      document.getElementById('featured-platinum').value = concert.stocks?.platinum;
+
+      // Back Details
+      document.getElementById('featured-full-date').value = concert.backDetails.date;
+      document.getElementById('featured-time').value = concert.backDetails.time;
+
+      // About
+      document.getElementById('featured-about').value = concert.about;
+  
+      // Artists
+      loadArtists(concert.artists || []);
+  
+      // Location
+      document.getElementById('featured-address').value = concert.location?.address;
+      document.getElementById('featured-map-link').value = concert.location?.mapLink;
+      document.getElementById('featured-facilities').value = concert.location?.facilities?.join(', ');
+  
+            
+      const preview = document.getElementById('featured-image-preview');
+      preview.src = concert.image;
+      preview.style.display = 'block';
+      
+      // Scroll to form
+      document.getElementById('featured-form').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function deleteFeatured(id) {
+      if (confirm('Are you sure you want to delete this featured concert?')) {
+        adminData.featured = adminData.featured.filter(c => c.id != id);
+        loadFeaturedConcerts();
+        showAlert('Featured concert deleted successfully!');
+      }
+    }
+
+    function resetFeaturedForm() {
+      document.getElementById('featured-form').reset();
+      document.getElementById('featured-id').value = '';
+      document.getElementById('featured-image-preview').style.display = 'none';
+      document.getElementById('featured-image-input').value = '';
+    }
+
+    // All Concerts CRUD operations
+    function saveAllConcert() {
+      const id = document.getElementById('all-id').value;
+      const title = document.getElementById('all-title').value;
+      const genre = document.getElementById('all-genre').value;
+      const venue = document.getElementById('all-venue').value;
+      const day = document.getElementById('all-day').value;
+      const month = document.getElementById('all-month').value;
+      const description = document.getElementById('all-description').value;
+
+      // Harga dan Stok
+      const regularPrice = document.getElementById('all-price-regular').value;
+      const vipPrice = document.getElementById('all-price-vip').value;
+      const platinumPrice = document.getElementById('all-price-platinum').value;
+      const regularStock = document.getElementById('all-stock-regular').value;
+      const vipStock = document.getElementById('all-stock-vip').value;
+      const platinumStock = document.getElementById('all-stock-platinum').value;
+
+      // Back Details
+      const fullDate = document.getElementById('all-full-date').value;
+      const time = document.getElementById('all-time').value;
+
+      // About
+      const about = document.getElementById('all-about').value;
+  
+      // Location
+      const address = document.getElementById('all-address').value;
+      const mapLink = document.getElementById('all-map-link').value;
+      const facilities = document.getElementById('all-facilities').value.split(',').map(f => f.trim());
+  
+      // Artists
+      const artistFields = document.querySelectorAll('.artist-field');
+      const artists = Array.from(artistFields).map(field => ({
+        name: field.querySelector('.artist-name').value,
+        image: field.querySelector('.artist-image').value
+      }));
+           
+      // Get image (either existing or new)
+      let image = '';
+      const imageInput = document.getElementById('all-image-input');
+      if (imageInput.files.length > 0) {
+        // In a real app, you would upload the image and get a URL
+        // For demo, we'll use a fake URL
+        image = URL.createObjectURL(imageInput.files[0]);
+      } else {
+        // Find existing image if editing
+        if (id) {
+          const existingConcert = adminData.all.find(c => c.id == id);
+          if (existingConcert) image = existingConcert.image;
+        }
+      }
+      
+      if (!image) {
+        alert('Please upload an image');
+        return;
+      }
+      
+      const concertData = {
+        id: id || Math.max(...adminData.all.map(c => c.id), 0) + 1,
+        image,
+        title,
+        genre,
+        venue,
+        date: { day, month },
+        description,
+        backDetails: {
+          date: fullDate,
+          time,
+          venue
+        },
+        price: platinumPrice, // Using platinum as the displayed price
+        prices: {
+          regular: regularPrice,
+          vip: vipPrice,
+          platinum: platinumPrice
+        },
+        stocks: {
+          regular: regularStock,
+          vip: vipStock,
+          platinum: platinumStock
+        },
+        about,
+        artists,
+        location: {
+          venue,
+          address,
+          mapLink,
+          facilities
+        }
+      };
+      
+      if (id) {
+        // Update existing concert
+        const index = adminData.all.findIndex(c => c.id == id);
+        if (index !== -1) {
+          adminData.all[index] = concertData;
+        }
+      } else {
+        // Add new concert
+        adminData.all.push(concertData);
+      }
+      
+      // Reset form and reload data
+      resetAllForm();
+      loadAllConcerts();
+      showAlert('Concert saved successfully!');
+    }
+
+    function editAllConcert(id) {
+      const concert = adminData.all.find(c => c.id == id);
+      if (!concert) return;
+      
+      document.getElementById('all-id').value = concert.id;
+      document.getElementById('all-title').value = concert.title;
+      document.getElementById('all-genre').value = concert.genre;
+      document.getElementById('all-venue').value = concert.venue;
+      document.getElementById('all-day').value = concert.date.day;
+      document.getElementById('all-month').value = concert.date.month;
+      document.getElementById('all-description').value = concert.description;
+
+      // Price and Stock
+      document.getElementById('all-price-regular').value = concert.prices.regular;
+      document.getElementById('all-price-vip').value = concert.prices.vip;
+      document.getElementById('all-price-platinum').value = concert.prices.platinum;
+      document.getElementById('all-stock-regular').value = concert.stocks?.regular;
+      document.getElementById('all-stock-vip').value = concert.stocks?.vip;
+      document.getElementById('all-stock-platinum').value = concert.stocks?.platinum;
+
+      // Back Details
+      document.getElementById('all-full-date').value = concert.backDetails.date;
+      document.getElementById('all-time').value = concert.backDetails.time;
+
+      // About
+      document.getElementById('all-about').value = concert.about;
+  
+      // Artists
+      loadArtists(concert.artists || []);
+  
+      // Location
+      document.getElementById('all-address').value = concert.location?.address;
+      document.getElementById('all-map-link').value = concert.location?.mapLink;
+      document.getElementById('all-facilities').value = concert.location?.facilities?.join(', ');
+           
+      const preview = document.getElementById('all-image-preview');
+      preview.src = concert.image;
+      preview.style.display = 'block';
+      
+      // Scroll to form
+      document.getElementById('all-form').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function deleteAllConcert(id) {
+      if (confirm('Are you sure you want to delete this concert?')) {
+        adminData.all = adminData.all.filter(c => c.id != id);
+        loadAllConcerts();
+        showAlert('Concert deleted successfully!');
+      }
+    }
+
+    function resetAllForm() {
+      document.getElementById('all-form').reset();
+      document.getElementById('all-id').value = '';
+      document.getElementById('all-image-preview').style.display = 'none';
+      document.getElementById('all-image-input').value = '';
+    }
+
+    // Show alert message
+    function showAlert(message) {
+      const alert = document.querySelector('.admin-alert');
+      alert.querySelector('strong').textContent = message.split('!')[0] + '!';
+      alert.querySelector('strong').nextSibling.textContent = ' ' + message.split('!')[1];
+      alert.classList.add('show');
+      
+      // Hide after 3 seconds
+      setTimeout(hideAlert, 3000);
+    }
+
+    function hideAlert() {
+      document.querySelector('.admin-alert').classList.remove('show');
+    }
+  </script>
+</body>
+</html>
